@@ -48,12 +48,12 @@ MAX_BAG_SIZE=2000000000  # bytes
 
 # ── Topic lists ───────────────────────────────────────────────────────────────
 OBSERVATION_TOPICS=(
-    /lucid/camera_fl/image_raw
-    /lucid/camera_fr/image_raw
-    /lucid/camera_fl/camera_info
-    /lucid/camera_fr/camera_info
-    /navsatfix
-    /insnavgeod
+    /lucid_vision/camera_fl/image
+    /lucid_vision/camera_fr/image
+    /lucid_vision/camera_fl/camera_info
+    /lucid_vision/camera_fr/camera_info
+    # /navsatfix
+    # /insnavgeod
     /pacmod/vehicle_speed_rpt
 )
 
@@ -83,10 +83,10 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # no color
 
-# ── Topic health check (runs all in parallel, 3 s timeout each) ───────────────
+# ── Topic health check (runs all in parallel, 10 s timeout each) ───────────────
 check_topic() {
     local topic="$1"
-    if timeout 3 ros2 topic echo --once --qos-reliability best_effort "$topic" > /dev/null 2>&1; then
+    if timeout 10 ros2 topic echo --once --qos-reliability best_effort "$topic" > /dev/null 2>&1; then
         echo -e "  ${GREEN}[LIVE]${NC}  $topic"
     else
         echo -e "  ${RED}[DEAD]${NC}  $topic"
@@ -118,7 +118,7 @@ read -rp "  Press ENTER to check topics, or Ctrl+C to abort... "
 
 # ── Topic health check ────────────────────────────────────────────────────────
 echo ""
-echo "  Checking topics (3 s timeout each, running in parallel)..."
+echo "  Checking topics (10 s timeout each, running in parallel)..."
 echo ""
 PIDS=()
 for t in "${ALL_TOPICS[@]}"; do
