@@ -130,8 +130,8 @@ void SscJoystickNode::loadParams()
   steering_axes_ = this->declare_parameter("steering_axes", 3);
   steering_sign_ = this->declare_parameter("steering_sign", 1.0f);
   steering_exponent_ = this->declare_parameter("steering_exponent", 2.5f);
-  max_curvature_ = this->declare_parameter("max_curvature", 0.5f);
-  max_curvature_rate_ = this->declare_parameter("max_curvature_rate", 0.5f);
+  max_curvature_ = this->declare_parameter("max_curvature", 0.12f);
+  max_curvature_rate_ = this->declare_parameter("max_curvature_rate", 0.10f);
 
   test_quick_brake_ = this->declare_parameter("test_quick_brake", false);
   quick_brake_speed_ = this->declare_parameter("quick_brake_speed", 0.0f);
