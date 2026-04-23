@@ -161,11 +161,24 @@ void SocketCanReceiverNode::receive()
 
       try {
         receive_id = receiver_->receive(frame_msg.data.data(), interval_ns_);
+      } catch (const SocketCanTimeout &) {
+        continue;
       } catch (const std::exception & ex) {
         RCLCPP_WARN_THROTTLE(
           this->get_logger(), *this->get_clock(), 1000,
-          "Error receiving CAN message: %s - %s",
+          "Error receiving CAN message: %s - %s. Reopening socket...",
           interface_.c_str(), ex.what());
+        try {
+          receiver_ = std::make_unique<SocketCanReceiver>(interface_, enable_fd_);
+          auto filters = get_parameter("filters").as_string();
+          receiver_->SetCanFilters(SocketCanReceiver::CanFilterList(filters));
+        } catch (const std::exception & reopen_ex) {
+          RCLCPP_ERROR_THROTTLE(
+            this->get_logger(), *this->get_clock(), 1000,
+            "Failed to reopen CAN socket: %s - %s",
+            interface_.c_str(), reopen_ex.what());
+          std::this_thread::sleep_for(1000ms);
+        }
         continue;
       }
 
@@ -197,11 +210,24 @@ void SocketCanReceiverNode::receive()
 
       try {
         receive_id = receiver_->receive_fd(fd_frame_msg.data.data<void>(), interval_ns_);
+      } catch (const SocketCanTimeout &) {
+        continue;
       } catch (const std::exception & ex) {
         RCLCPP_WARN_THROTTLE(
           this->get_logger(), *this->get_clock(), 1000,
-          "Error receiving CAN FD message: %s - %s",
+          "Error receiving CAN FD message: %s - %s. Reopening socket...",
           interface_.c_str(), ex.what());
+        try {
+          receiver_ = std::make_unique<SocketCanReceiver>(interface_, enable_fd_);
+          auto filters = get_parameter("filters").as_string();
+          receiver_->SetCanFilters(SocketCanReceiver::CanFilterList(filters));
+        } catch (const std::exception & reopen_ex) {
+          RCLCPP_ERROR_THROTTLE(
+            this->get_logger(), *this->get_clock(), 1000,
+            "Failed to reopen CAN socket: %s - %s",
+            interface_.c_str(), reopen_ex.what());
+          std::this_thread::sleep_for(1000ms);
+        }
         continue;
       }
 
