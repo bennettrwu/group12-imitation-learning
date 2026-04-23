@@ -53,17 +53,30 @@ LNI::CallbackReturn SocketCanReceiverNode::on_configure(const lc::State & state)
 {
   (void)state;
 
-  try {
-    receiver_ = std::make_unique<SocketCanReceiver>(interface_, enable_fd_);
-    // apply CAN filters
-    auto filters = get_parameter("filters").as_string();
-    receiver_->SetCanFilters(SocketCanReceiver::CanFilterList(filters));
-    RCLCPP_INFO(get_logger(), "applied filters: %s", filters.c_str());
-  } catch (const std::exception & ex) {
-    RCLCPP_ERROR(
-      this->get_logger(), "Error opening CAN receiver: %s - %s",
-      interface_.c_str(), ex.what());
-    return LNI::CallbackReturn::FAILURE;
+  // Retry opening the socket so the node survives being launched before can_start.sh runs.
+  constexpr int kMaxRetries = 10;
+  constexpr auto kRetryInterval = std::chrono::milliseconds(1000);
+  for (int attempt = 0; attempt <= kMaxRetries; ++attempt) {
+    try {
+      receiver_ = std::make_unique<SocketCanReceiver>(interface_, enable_fd_);
+      auto filters = get_parameter("filters").as_string();
+      receiver_->SetCanFilters(SocketCanReceiver::CanFilterList(filters));
+      RCLCPP_INFO(get_logger(), "applied filters: %s", filters.c_str());
+      break;
+    } catch (const std::exception & ex) {
+      if (attempt < kMaxRetries) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Error opening CAN receiver: %s - %s. Retrying in 1 s (%d/%d)...",
+          interface_.c_str(), ex.what(), attempt + 1, kMaxRetries);
+        std::this_thread::sleep_for(kRetryInterval);
+      } else {
+        RCLCPP_ERROR(
+          this->get_logger(), "Error opening CAN receiver: %s - %s",
+          interface_.c_str(), ex.what());
+        return LNI::CallbackReturn::FAILURE;
+      }
+    }
   }
 
   RCLCPP_DEBUG(this->get_logger(), "Receiver successfully configured.");

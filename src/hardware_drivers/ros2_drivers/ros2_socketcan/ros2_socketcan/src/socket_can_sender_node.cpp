@@ -20,6 +20,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 
 namespace lc = rclcpp_lifecycle;
@@ -48,13 +49,27 @@ LNI::CallbackReturn SocketCanSenderNode::on_configure(const lc::State & state)
 {
   (void)state;
 
-  try {
-    sender_ = std::make_unique<SocketCanSender>(interface_, enable_fd_);
-  } catch (const std::exception & ex) {
-    RCLCPP_ERROR(
-      this->get_logger(), "Error opening CAN sender: %s - %s",
-      interface_.c_str(), ex.what());
-    return LNI::CallbackReturn::FAILURE;
+  // Retry opening the socket so the node survives being launched before can_start.sh runs.
+  constexpr int kMaxRetries = 10;
+  constexpr auto kRetryInterval = std::chrono::milliseconds(1000);
+  for (int attempt = 0; attempt <= kMaxRetries; ++attempt) {
+    try {
+      sender_ = std::make_unique<SocketCanSender>(interface_, enable_fd_);
+      break;
+    } catch (const std::exception & ex) {
+      if (attempt < kMaxRetries) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Error opening CAN sender: %s - %s. Retrying in 1 s (%d/%d)...",
+          interface_.c_str(), ex.what(), attempt + 1, kMaxRetries);
+        std::this_thread::sleep_for(kRetryInterval);
+      } else {
+        RCLCPP_ERROR(
+          this->get_logger(), "Error opening CAN sender: %s - %s",
+          interface_.c_str(), ex.what());
+        return LNI::CallbackReturn::FAILURE;
+      }
+    }
   }
 
   RCLCPP_DEBUG(this->get_logger(), "Sender successfully configured.");
