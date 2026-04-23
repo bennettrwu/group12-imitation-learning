@@ -87,10 +87,16 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # no color
 
 # ── Topic health check (runs all in parallel, 10 s timeout each) ───────────────
+# Try reliable QoS first, then best_effort, then fall back to topic-list presence.
+# This handles /tf_static (transient_local), /pacmod/* (reliable), and camera topics (best_effort).
 check_topic() {
     local topic="$1"
-    if timeout 10 ros2 topic echo --once --qos-reliability best_effort "$topic" > /dev/null 2>&1; then
+    if timeout 10 ros2 topic echo --once "$topic" > /dev/null 2>&1; then
         echo -e "  ${GREEN}[LIVE]${NC}  $topic"
+    elif timeout 10 ros2 topic echo --once --qos-reliability best_effort "$topic" > /dev/null 2>&1; then
+        echo -e "  ${GREEN}[LIVE]${NC}  $topic"
+    elif ros2 topic list 2>/dev/null | grep -qx "$topic"; then
+        echo -e "  ${YELLOW}[IDLE]${NC}  $topic  (advertised but no messages yet)"
     else
         echo -e "  ${RED}[DEAD]${NC}  $topic"
     fi
@@ -174,6 +180,20 @@ monitor_bag() {
     done
 }
 
+# ── QoS overrides (written to a temp file, cleaned up on exit) ────────────────
+# /tf_static uses transient_local durability — the bag recorder must match or it
+# misses the latched message if it starts after the publisher.
+QOS_OVERRIDES_FILE=$(mktemp /tmp/bag_qos_XXXXXX.yaml)
+cat > "${QOS_OVERRIDES_FILE}" << 'EOF'
+/tf_static:
+  subscription:
+    durability: transient_local
+    reliability: reliable
+    history: keep_last
+    depth: 100
+EOF
+trap 'kill ${MONITOR_PID} 2>/dev/null; rm -f "${QOS_OVERRIDES_FILE}"; echo ""' EXIT
+
 # ── Record ────────────────────────────────────────────────────────────────────
 echo ""
 echo "============================================================"
@@ -182,11 +202,12 @@ echo "============================================================"
 
 monitor_bag &
 MONITOR_PID=$!
-trap "kill ${MONITOR_PID} 2>/dev/null; echo ''" EXIT
+# trap is already set above with QOS_OVERRIDES_FILE cleanup
 
 ros2 bag record \
     --output "${BAG_PATH}" \
     --max-bag-size "${MAX_BAG_SIZE}" \
+    --qos-profile-overrides-path "${QOS_OVERRIDES_FILE}" \
     "${ALL_TOPICS[@]}"
 
 # ── Post-recording summary ────────────────────────────────────────────────────
