@@ -9,25 +9,6 @@
 #   ./record_demo.sh parking_lot_test
 #
 # Output: ~/CS588_STUDENTS/group_12/data/<session_label>/YYYYMMDD_HHMMSS/
-#
-# Topics recorded:
-#   Observations:
-#     /lucid/camera_fl/image_raw       — front-left camera  (15 fps, rgb8)
-#     /lucid/camera_fr/image_raw       — front-right camera (15 fps, rgb8)
-#     /lucid/camera_fl/camera_info     — front-left intrinsics
-#     /lucid/camera_fr/camera_info     — front-right intrinsics
-#     /navsatfix                       — GPS lat/lon/alt (NavSatFix)
-#     /insnavgeod                      — INS heading + orientation (INSNavGeod)
-#     /pacmod/vehicle_speed_rpt        — wheel speed feedback (VehicleSpeedRpt)
-#   Actions (human driver commands):
-#     /pacmod/steering_cmd             — steering position + speed cmd (PositionWithSpeed)
-#     /pacmod/steering_rpt             — actual steering angle feedback (SystemRptFloat)
-#     /pacmod/accel_cmd                — throttle command (SystemCmdFloat)
-#     /pacmod/brake_cmd                — brake command (SystemCmdFloat)
-#     /pacmod/enabled                  — DBW enable status (Bool)
-#
-# WARNING: Two raw cameras at 15 fps generate ~500–800 MB/min.
-#   Use --max-bag-size to split large bags (see MAX_BAG_SIZE below).
 
 set -e
 
@@ -47,25 +28,47 @@ BAG_PATH="${DATA_ROOT}/${SESSION_LABEL}/${TIMESTAMP}"
 MAX_BAG_SIZE=2000000000  # bytes
 
 # ── Topic lists ───────────────────────────────────────────────────────────────
+
+# --- Essential: visual input + calibration ---
 OBSERVATION_TOPICS=(
-    /lucid_vision/camera_fl/image
-    /lucid_vision/camera_fr/image
-    /lucid_vision/camera_fl/camera_info
-    /lucid_vision/camera_fr/camera_info
-    # /navsatfix
-    # /insnavgeod
-    /pacmod/vehicle_speed_rpt
+    /oak/rgb/image_raw
+    /oak/rgb/camera_info
+    /oak/imu/data
 )
 
+# --- Essential: steering labels + vehicle state ---
 ACTION_TOPICS=(
+    /joy
     /pacmod/steering_cmd
     /pacmod/steering_rpt
     /pacmod/accel_cmd
+    /pacmod/accel_rpt
     /pacmod/brake_cmd
+    /pacmod/brake_rpt
+    /pacmod/vehicle_speed_rpt
     /pacmod/enabled
 )
 
-ALL_TOPICS=("${OBSERVATION_TOPICS[@]}" "${ACTION_TOPICS[@]}")
+# --- Transforms (needed for post-processing alignment) ---
+TF_TOPICS=(
+    /tf
+    /tf_static
+)
+
+# --- Nice to have (comment out any you don't need to save disk space) ---
+EXTRA_TOPICS=(
+    /oak/stereo/image_raw
+    /oak/stereo/camera_info
+    /pacmod/wheel_speed_rpt
+    /navsatfix
+)
+
+ALL_TOPICS=(
+    "${OBSERVATION_TOPICS[@]}"
+    "${ACTION_TOPICS[@]}"
+    "${TF_TOPICS[@]}"
+    "${EXTRA_TOPICS[@]}"
+)
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 if ! command -v ros2 &>/dev/null; then
@@ -100,6 +103,7 @@ echo "============================================================"
 echo "  Session  : ${SESSION_LABEL}"
 echo "  Bag path : ${BAG_PATH}"
 echo "  Max size : $(( MAX_BAG_SIZE / 1000000 )) MB per file (then splits)"
+echo "  Topics   : ${#ALL_TOPICS[@]} total"
 echo ""
 echo "  Make sure each of the following is running in its own terminal"
 echo "  (run 'source install/setup.bash' in each terminal first):"
@@ -120,15 +124,44 @@ read -rp "  Press ENTER to check topics, or Ctrl+C to abort... "
 echo ""
 echo "  Checking topics (10 s timeout each, running in parallel)..."
 echo ""
+
+echo "  --- Observation ---"
 PIDS=()
-for t in "${ALL_TOPICS[@]}"; do
+for t in "${OBSERVATION_TOPICS[@]}"; do
+    check_topic "$t" &
+    PIDS+=($!)
+done
+for pid in "${PIDS[@]}"; do wait "$pid"; done
+
+echo "  --- Action ---"
+PIDS=()
+for t in "${ACTION_TOPICS[@]}"; do
+    check_topic "$t" &
+    PIDS+=($!)
+done
+for pid in "${PIDS[@]}"; do wait "$pid"; done
+
+echo "  --- Transforms ---"
+PIDS=()
+for t in "${TF_TOPICS[@]}"; do
+    check_topic "$t" &
+    PIDS+=($!)
+done
+for pid in "${PIDS[@]}"; do wait "$pid"; done
+
+echo "  --- Extra ---"
+PIDS=()
+for t in "${EXTRA_TOPICS[@]}"; do
     check_topic "$t" &
     PIDS+=($!)
 done
 for pid in "${PIDS[@]}"; do wait "$pid"; done
 
 echo ""
-read -rp "  If all critical topics are LIVE, press ENTER to start recording, or Ctrl+C to abort... "
+echo -e "  ${YELLOW}NOTE:${NC} EXTRA topics are nice-to-have. DEAD extras won't block recording."
+echo -e "  ${YELLOW}NOTE:${NC} Observation + Action topics should all be LIVE."
+echo ""
+read -rp "  If critical topics are LIVE, press ENTER to start recording, or Ctrl+C to abort... "
 
 # ── Bag size monitor (background) ─────────────────────────────────────────────
 monitor_bag() {
