@@ -1,0 +1,20 @@
+# ROS 2 Build Artifacts
+build/
+install/
+log/
+COLCON_IGNORE
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C++
+*.so
+
+# IDEs
+.vscode/
+.idea/
+
+# System
+.DS_Store
