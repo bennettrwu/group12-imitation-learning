@@ -6,3 +6,4 @@ opencv-python==4.10
 scipy==1.13
 tqdm==4.66
 PyYAML==6.0
+pygame==2.6.0   # ROS2 lane_following node only (joystick handshake)
