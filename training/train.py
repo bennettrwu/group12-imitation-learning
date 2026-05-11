@@ -37,7 +37,8 @@ def build_transform(image_size: int = 224, augment: bool = False):
 def epoch_loss(model, loader, device, optimizer=None) -> float:
     train = optimizer is not None
     model.train(train)
-    loss_fn = nn.MSELoss(reduction="sum")
+    # loss_fn = nn.MSELoss(reduction="sum")
+    loss_fn = nn.MSELoss()
     total_loss = 0.0
     total_n = 0
     ctx = torch.enable_grad() if train else torch.no_grad()
@@ -46,12 +47,15 @@ def epoch_loss(model, loader, device, optimizer=None) -> float:
             rgb = batch["rgb_seq"].to(device, non_blocking=True)
             y = batch["steering"].to(device, non_blocking=True)
             pred = model(rgb)
+            pred.squeeze(-1)        # New line to ensure no broadcasting is necessary
             loss = loss_fn(pred, y)
             if train:
                 optimizer.zero_grad()
-                (loss / rgb.size(0)).backward()
+                # (loss / rgb.size(0)).backward()
+                loss.backward()
                 optimizer.step()
-            total_loss += loss.item()
+            # total_loss += loss.item()
+            total_loss += loss.item() * rgb.size(0)
             total_n += rgb.size(0)
     return total_loss / total_n
 
@@ -112,12 +116,17 @@ def main():
 
     model = MODELS[args.model]().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', patience=5, factor=0.5
+    )
 
     history = []
     best_val = float("inf")
     for epoch in range(1, args.epochs + 1):
         train_mse = epoch_loss(model, train_loader, device, optimizer)
         val_mse = epoch_loss(model, val_loader, device)
+
+        scheduler.step(val_mse)         # Added a scheduler
 
         history.append((epoch, train_mse, val_mse))
 
