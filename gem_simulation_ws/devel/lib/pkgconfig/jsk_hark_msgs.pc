@@ -1,0 +1,8 @@
+prefix=/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel
+
+Name: jsk_hark_msgs
+Description: Description of jsk_hark_msgs
+Version: 4.3.2
+Cflags: -I/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel/include
+Libs: -L${prefix}/lib 
+Requires: std_msgs

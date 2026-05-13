@@ -1,0 +1,8 @@
+prefix=/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel
+
+Name: jsk_footstep_msgs
+Description: Description of jsk_footstep_msgs
+Version: 4.3.2
+Cflags: -I/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel/include
+Libs: -L${prefix}/lib 
+Requires: geometry_msgs actionlib_msgs message_runtime
