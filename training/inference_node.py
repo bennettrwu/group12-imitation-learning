@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Run in simulator container with:
+
+    rosrun gem_gazebo inference_node.py _model:=cnn _speed:=2
+"""
 import rospy
 import torch
 from torchvision import transforms
