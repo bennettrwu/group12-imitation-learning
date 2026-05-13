@@ -37,8 +37,8 @@ class PurePursuit(object):
 
         self.rate       = rospy.Rate(20)
 
-        self.look_ahead = 6    # meters
-        self.wheelbase  = 1.75 # meters
+        self.look_ahead = 2    # meters
+        self.wheelbase  = 3.42 # meters
         self.goal       = 0
 
         self.read_waypoints() # read waypoints
@@ -85,7 +85,7 @@ class PurePursuit(object):
         
         try:
             service_response = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
-            model_state = service_response(model_name='gem')
+            model_state = service_response(model_name='gem_e4')
         except rospy.ServiceException as exc:
             rospy.loginfo("Service did not process request: " + str(exc))
 
@@ -109,21 +109,26 @@ class PurePursuit(object):
             self.path_points_x = np.array(self.path_points_x)
             self.path_points_y = np.array(self.path_points_y)
 
-            # finding the distance of each way point from the current position
-            for i in range(len(self.path_points_x)):
-                self.dist_arr[i] = self.dist((self.path_points_x[i], self.path_points_y[i]), (curr_x, curr_y))
+            # distance from every waypoint to the car (vectorized)
+            self.dist_arr = np.hypot(self.path_points_x - curr_x,
+                                     self.path_points_y - curr_y)
 
-            # finding those points which are less than the look ahead distance (will be behind and ahead of the vehicle)
-            goal_arr = np.where( (self.dist_arr < self.look_ahead + 0.3) & (self.dist_arr > self.look_ahead - 0.3) )[0]
-
-            # finding the goal point which is the last in the set of points less than the lookahead distance
-            for idx in goal_arr:
-                v1 = [self.path_points_x[idx]-curr_x , self.path_points_y[idx]-curr_y]
-                v2 = [np.cos(curr_yaw), np.sin(curr_yaw)]
-                temp_angle = self.find_angle(v1,v2)
-                if abs(temp_angle) < np.pi/2:
-                    self.goal = idx
-                    break
+            # search forward along the path from the last goal so a closed
+            # loop with dense waypoints doesn't latch onto the wrong segment
+            N = len(self.path_points_x)
+            cos_y, sin_y = np.cos(curr_yaw), np.sin(curr_yaw)
+            new_goal = self.goal
+            for offset in range(N):
+                idx = (self.goal + offset) % N
+                d = self.dist_arr[idx]
+                if self.look_ahead - 0.3 < d < self.look_ahead + 0.3:
+                    v1 = [self.path_points_x[idx] - curr_x,
+                          self.path_points_y[idx] - curr_y]
+                    v2 = [cos_y, sin_y]
+                    if abs(self.find_angle(v1, v2)) < np.pi / 2:
+                        new_goal = idx
+                        break
+            self.goal = new_goal
 
             # finding the distance between the goal point and the vehicle
             # true look-ahead distance between a waypoint and current position
@@ -135,11 +140,9 @@ class PurePursuit(object):
             goal_x_veh_coord = gvcx*np.cos(curr_yaw) + gvcy*np.sin(curr_yaw)
             goal_y_veh_coord = gvcy*np.cos(curr_yaw) - gvcx*np.sin(curr_yaw)
 
-            # find the curvature and the angle 
-            alpha   = self.path_points_yaw[self.goal] - (curr_yaw)
-            k       = 0.285
-            angle_i = math.atan((2 * k * self.wheelbase * math.sin(alpha)) / L) 
-            angle   = angle_i*2
+            # bearing to the lookahead point in the vehicle frame
+            alpha   = math.atan2(goal_y_veh_coord, goal_x_veh_coord)
+            angle   = math.atan2(2.0 * self.wheelbase * math.sin(alpha), L)
             angle   = round(np.clip(angle, -0.61, 0.61), 3)
 
             ct_error = round(np.sin(alpha) * L, 3)
@@ -147,7 +150,7 @@ class PurePursuit(object):
             print("Crosstrack Error: " + str(ct_error))
 
             # implement constant pure pursuit controller
-            self.ackermann_msg.speed          = 2.8
+            self.ackermann_msg.speed          = 1
             self.ackermann_msg.steering_angle = angle
             self.ackermann_pub.publish(self.ackermann_msg)
 
