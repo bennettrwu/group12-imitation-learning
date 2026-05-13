@@ -18,6 +18,7 @@ class SteeringDataset(Dataset):
         seq_len: int = 1,
         sequences: list[str] | None = None,
         rgb_transform=None,
+        augment: bool = False
     ):
         """
         Args:
@@ -29,6 +30,7 @@ class SteeringDataset(Dataset):
         self.root          = Path(root)
         self.seq_len       = seq_len
         self.rgb_transform = rgb_transform
+        self.augment = augment
 
         self._index    = []  # (seq_dir, seq_name, frame_idx, ctrl_ts)
         self._controls = {}  # seq_name -> {timestamp_ns -> steering_output_rad}
@@ -66,6 +68,9 @@ class SteeringDataset(Dataset):
             seq_name = self._index[i][1]
             if all(self._index[i - k][1] == seq_name for k in range(seq_len)):
                 self._seq_end_idx.append(i)
+                # self._seq_end_idx.append((i, False)) # original
+                # if augment:
+                #     self._seq_end_idx.append((i,True)) # flipped
 
     def __len__(self) -> int:
         return len(self._seq_end_idx)
@@ -80,16 +85,24 @@ class SteeringDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         end = self._seq_end_idx[idx]
+        # print("Acceptable length: ", len(self._seq_end_idx))
+        # print("index: ", idx)
+        # end, flipped = self._seq_end_idx[idx] # unpack 'flipped' flag
 
         frames = [self._index[end - k] for k in reversed(range(self.seq_len))]
         rgb_seq = torch.stack([self._load_rgb(seq_dir, fi) for seq_dir, _, fi, _ in frames])
 
         seq_name, _, frame_idx, ctrl_ts = frames[-1][1], frames[-1][0], frames[-1][2], frames[-1][3]
-        steering = torch.tensor(self._controls[seq_name][ctrl_ts], dtype=torch.float32)
+        # steering = torch.tensor(self._controls[seq_name][ctrl_ts], dtype=torch.float32)
+        steering = self._controls[seq_name][ctrl_ts]
+
+        # if flipped:
+        #     rgb_seq = torch.flip(rgb_seq, dims=[-1])
+        #     steering = -steering
 
         return {
             'rgb_seq':   rgb_seq,    # [T, 3, H, W]
-            'steering':  steering,   # scalar
+            'steering':  torch.tensor(steering, dtype=torch.float32),   # scalar
             'sequence':  seq_name,
             'frame_idx': frame_idx,
         }

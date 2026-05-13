@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rospy
 import torch
+from torchvision import transforms
 import torchvision.transforms.functional as TF
 import cv2
 import numpy as np
@@ -10,9 +11,9 @@ from ackermann_msgs.msg import AckermannDrive
 from cv_bridge import CvBridge
 
 CHECKPOINTS = {
-    "cnn":      "/home/guests1/host/gem_simulation_ws/checkpoints/cnn/best.ts.pt",
-    "cnn_lstm": "/home/guests1/host/gem_simulation_ws/checkpoints/cnn_lstm/best.ts.pt",
-    "cnn_node": "/home/guests1/host/gem_simulation_ws/checkpoints/cnn_node/best.ts.pt",
+    "cnn":      "/home/marialusardi/host/Classes/gem_simulation_ws/checkpoints/cnn/best.ts.pt",
+    "cnn_lstm": "/home/marialusardi/host/Classes}/gem_simulation_ws/checkpoints/cnn_lstm/best.ts.pt",
+    "cnn_node": "/home/marialusardi/host/Classes/gem_simulation_ws/checkpoints/cnn_node/best.ts.pt",
 }
 SEQ_LENS       = {"cnn": 1, "cnn_lstm": 3, "cnn_node": 3}
 IMAGE_TOPIC    = "/oak/rgb/image_raw"
@@ -29,22 +30,26 @@ class ImitationLearningNode:
         self.model_name = model_name
         self.seq_len    = SEQ_LENS[model_name]
         rospy.loginfo(f"[IL] Loading {model_name} (seq_len={self.seq_len})")
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda")
         self.model  = torch.jit.load(CHECKPOINTS[model_name], map_location=self.device)
         self.model.eval()
         rospy.loginfo(f"[IL] Model ready on {self.device}")
         self.bridge       = CvBridge()
         self.frame_buffer = deque(maxlen=self.seq_len)
         self.pub = rospy.Publisher(STEERING_TOPIC, AckermannDrive, queue_size=1)
+        self.tf = transforms.Compose([
+            transforms.Resize((IMG_H, IMG_W), antialias=True),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+        ])
         rospy.Subscriber(IMAGE_TOPIC, Image, self.image_callback, queue_size=1, buff_size=2**24)
         rospy.loginfo(f"[IL] Subscribed to {IMAGE_TOPIC}, speed={self.speed} m/s")
 
     def preprocess(self, ros_image):
         img = self.bridge.imgmsg_to_cv2(ros_image, desired_encoding="rgb8")
-        img = cv2.resize(img, (IMG_W, IMG_H))
+        # img = cv2.resize(img, (IMG_W, IMG_H))
         tensor = torch.from_numpy(img.astype(np.float32) / 255.0).permute(2, 0, 1)
-        tensor = TF.normalize(tensor, mean=IMAGENET_MEAN, std=IMAGENET_STD)
-        return tensor
+        # tensor = TF.normalize(tensor, mean=IMAGENET_MEAN, std=IMAGENET_STD)
+        return self.tf(tensor)
 
     def image_callback(self, msg):
         try:
