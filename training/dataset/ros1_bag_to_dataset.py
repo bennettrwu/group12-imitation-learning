@@ -2,6 +2,9 @@
 """
 Transcribe ROS1 bags into a structured dataset (RGB + steering only).
 
+Collect data in simulator using:
+  rosbag record /ackermann_cmd /oak/rgb/camera_info /oak/rgb/image_raw /oak/rgb/image_raw/compressed
+
 Usage:
   python3 bag_to_dataset.py <bag_or_dir> <output_dir> [--max-dt 0.1]
 
