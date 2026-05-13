@@ -1,2 +1,0 @@
-set(hector_gazebo_plugins_MESSAGE_FILES "")
-set(hector_gazebo_plugins_SERVICE_FILES "/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/src/POLARIS_GEM_Simulator/ros_drivers/hector_gazebo/hector_gazebo_plugins/srv/SetBias.srv;/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/src/POLARIS_GEM_Simulator/ros_drivers/hector_gazebo/hector_gazebo_plugins/srv/SetReferenceGeoPose.srv")

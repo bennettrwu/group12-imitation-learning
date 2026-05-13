@@ -1,8 +1,0 @@
-prefix=/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel
-
-Name: jsk_topic_tools
-Description: Description of jsk_topic_tools
-Version: 2.2.11
-Cflags: -I/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel/include -I/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/src/POLARIS_GEM_Simulator/ros_drivers/jsk_rviz/jsk_topic_tools/include
-Libs: -L${prefix}/lib -ljsk_topic_tools
-Requires: topic_tools message_runtime nodelet std_msgs std_srvs roscpp rostime

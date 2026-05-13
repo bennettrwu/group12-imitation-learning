@@ -1,8 +1,0 @@
-prefix=/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel
-
-Name: gem_description
-Description: Description of gem_description
-Version: 1.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

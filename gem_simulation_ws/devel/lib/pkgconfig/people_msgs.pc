@@ -1,8 +1,0 @@
-prefix=/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel
-
-Name: people_msgs
-Description: Description of people_msgs
-Version: 1.4.0
-Cflags: -I/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel/include
-Libs: -L${prefix}/lib 
-Requires: geometry_msgs message_runtime std_msgs

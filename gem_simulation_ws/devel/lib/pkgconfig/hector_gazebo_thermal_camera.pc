@@ -1,8 +1,0 @@
-prefix=/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/devel
-
-Name: hector_gazebo_thermal_camera
-Description: Description of hector_gazebo_thermal_camera
-Version: 0.5.4
-Cflags: -I/home/bennett/host/Documents/group12-imitation-learning/gem_simulation_ws/src/POLARIS_GEM_Simulator/ros_drivers/hector_gazebo/hector_gazebo_thermal_camera/include
-Libs: -L${prefix}/lib 
-Requires: gazebo_plugins
