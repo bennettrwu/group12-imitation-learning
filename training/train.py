@@ -62,7 +62,7 @@ def epoch_loss(model, loader, device, optimizer=None) -> float:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", choices=list(MODELS), required=True)
-    p.add_argument("--data-root", default="data/processed")
+    p.add_argument("--data-root", default="data/processed_sim")
     p.add_argument("--output-dir", default="training/checkpoints")
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch-size", type=int, default=64)

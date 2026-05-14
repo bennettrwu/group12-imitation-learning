@@ -189,7 +189,7 @@ def process_bag(bag_path: str, output_dir: str, max_dt_ns: int):
     with open(out / 'controls' / 'data.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['timestamp_ns',
-                         'steering_angle_rad', 'steering_angle_velocity_rad_s',
+                         'steering_output_rad', 'steering_angle_velocity_rad_s',
                          'speed_mps', 'acceleration_mps2', 'jerk_mps3'])
         writer.writerows(ctrl_rows)
 
