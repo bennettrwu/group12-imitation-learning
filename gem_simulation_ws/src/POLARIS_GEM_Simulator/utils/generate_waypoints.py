@@ -224,15 +224,10 @@ Current Settings:
             return
         
         try:
-            # Get current position and orientation
+            # Get current pose in the Gazebo world frame
             current_position = self.model_states.pose[self.vehicle_index].position
             current_orientation = self.model_states.pose[self.vehicle_index].orientation
-            
-            # Calculate relative coordinates (x, y)
-            rel_x = current_position.x - self.start_position.x
-            rel_y = current_position.y - self.start_position.y
-            
-            # Calculate relative heading
+
             quaternion = (
                 current_orientation.x,
                 current_orientation.y,
@@ -240,32 +235,22 @@ Current Settings:
                 current_orientation.w
             )
             _, _, current_yaw = tf.transformations.euler_from_quaternion(quaternion)
-            
-            # Calculate heading relative to starting orientation
-            relative_heading_rad = current_yaw - self.start_yaw
-            
-            # Convert to degrees and normalize to [-180, 180]
-            relative_heading = math.degrees(relative_heading_rad)
-            if relative_heading > 180:
-                relative_heading -= 360
-            elif relative_heading < -180:
-                relative_heading += 360
-                
-            # Create a waypoint record - negate coordinates as requested
+
+            # Normalize yaw to [-pi, pi]
+            yaw = math.atan2(math.sin(current_yaw), math.cos(current_yaw))
+
             waypoint = {
-                'rel_x': -rel_x,
-                'rel_y': -rel_y,
-                'rel_heading': math.radians(relative_heading)
+                'x': current_position.x,
+                'y': current_position.y,
+                'heading': yaw
             }
-            
-            # Add to waypoints list
+
             self.waypoints.append(waypoint)
-            
-            # Write to CSV file (just the values, no headers)
+
             with open(self.csv_filename, 'a', newline='') as csvfile:
                 writer = csv.writer(csvfile)
-                writer.writerow([waypoint['rel_x'], waypoint['rel_y'], waypoint['rel_heading']])
-            
+                writer.writerow([waypoint['x'], waypoint['y'], waypoint['heading']])
+
             return waypoint
             
         except Exception as e:
@@ -279,7 +264,7 @@ Current Settings:
             
         waypoint = self.save_waypoint()
         if waypoint:
-            rospy.loginfo(f"Recorded waypoint: x={waypoint['rel_x']:.3f}, y={waypoint['rel_y']:.3f}, heading={math.degrees(waypoint['rel_heading']):.2f}°")
+            rospy.loginfo(f"Recorded waypoint: x={waypoint['x']:.3f}, y={waypoint['y']:.3f}, heading={math.degrees(waypoint['heading']):.2f}°")
     
     def update_controls(self):
         """Update speed and steering based on currently pressed keys"""
