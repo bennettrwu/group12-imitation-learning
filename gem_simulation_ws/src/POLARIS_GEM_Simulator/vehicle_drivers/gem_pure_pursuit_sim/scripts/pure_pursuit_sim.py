@@ -17,7 +17,6 @@ import os
 import csv
 import math
 import numpy as np
-from numpy import linalg as la
 
 # ROS Headers
 import rospy
@@ -37,8 +36,8 @@ class PurePursuit(object):
 
         self.rate       = rospy.Rate(20)
 
-        self.look_ahead = 6    # meters
-        self.wheelbase  = 1.75 # meters
+        self.look_ahead = 3    # meters
+        self.wheelbase  = 3.42 # meters
         self.goal       = 0
 
         self.read_waypoints() # read waypoints
@@ -66,18 +65,6 @@ class PurePursuit(object):
         self.path_points_x   = [float(point[0]) for point in path_points]
         self.path_points_y   = [float(point[1]) for point in path_points]
         self.path_points_yaw = [float(point[2]) for point in path_points]
-        self.dist_arr        = np.zeros(len(self.path_points_x))
-
-    # computes the Euclidean distance between two 2D points
-    def dist(self, p1, p2):
-        return round(np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2), 3)
-
-    # find the angle bewtween two vectors    
-    def find_angle(self, v1, v2):
-        cosang = np.dot(v1, v2)
-        sinang = la.norm(np.cross(v1, v2))
-        # [-pi, pi]
-        return np.arctan2(sinang, cosang)
 
     def get_gem_pose(self):
 
@@ -85,7 +72,7 @@ class PurePursuit(object):
         
         try:
             service_response = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
-            model_state = service_response(model_name='gem')
+            model_state = service_response(model_name='gem_e4')
         except rospy.ServiceException as exc:
             rospy.loginfo("Service did not process request: " + str(exc))
 
@@ -100,49 +87,50 @@ class PurePursuit(object):
 
 
     def start_pp(self):
-        
+
+        self.path_points_x = np.array(self.path_points_x)
+        self.path_points_y = np.array(self.path_points_y)
+        n = len(self.path_points_x)
+
         while not rospy.is_shutdown():
 
             # get current position and orientation in the world frame
             curr_x, curr_y, curr_yaw = self.get_gem_pose()
+            cos_y, sin_y = np.cos(curr_yaw), np.sin(curr_yaw)
 
-            self.path_points_x = np.array(self.path_points_x)
-            self.path_points_y = np.array(self.path_points_y)
-
-            # finding the distance of each way point from the current position
-            for i in range(len(self.path_points_x)):
-                self.dist_arr[i] = self.dist((self.path_points_x[i], self.path_points_y[i]), (curr_x, curr_y))
-
-            # finding those points which are less than the look ahead distance (will be behind and ahead of the vehicle)
-            goal_arr = np.where( (self.dist_arr < self.look_ahead + 0.3) & (self.dist_arr > self.look_ahead - 0.3) )[0]
-
-            # finding the goal point which is the last in the set of points less than the lookahead distance
-            for idx in goal_arr:
-                v1 = [self.path_points_x[idx]-curr_x , self.path_points_y[idx]-curr_y]
-                v2 = [np.cos(curr_yaw), np.sin(curr_yaw)]
-                temp_angle = self.find_angle(v1,v2)
-                if abs(temp_angle) < np.pi/2:
-                    self.goal = idx
+            # advance the goal forward along the path (modulo n, so a closed
+            # loop wraps cleanly) until we find a waypoint that's at least
+            # look_ahead away and in front of the vehicle. Searching forward
+            # from self.goal avoids latching onto earlier waypoints when the
+            # path passes near itself.
+            idx = self.goal
+            for _ in range(n):
+                dx = self.path_points_x[idx] - curr_x
+                dy = self.path_points_y[idx] - curr_y
+                fwd = dx * cos_y + dy * sin_y
+                dist = math.hypot(dx, dy)
+                if dist >= self.look_ahead and fwd > 0:
                     break
+                idx = (idx + 1) % n
+            self.goal = idx
 
-            # finding the distance between the goal point and the vehicle
-            # true look-ahead distance between a waypoint and current position
-            L = self.dist_arr[self.goal]
-
-            # transforming the goal point into the vehicle coordinate frame 
+            # goal point in the vehicle frame: +x is forward, +y is left
             gvcx = self.path_points_x[self.goal] - curr_x
             gvcy = self.path_points_y[self.goal] - curr_y
-            goal_x_veh_coord = gvcx*np.cos(curr_yaw) + gvcy*np.sin(curr_yaw)
-            goal_y_veh_coord = gvcy*np.cos(curr_yaw) - gvcx*np.sin(curr_yaw)
+            goal_x_veh_coord = gvcx * cos_y + gvcy * sin_y
+            goal_y_veh_coord = gvcy * cos_y - gvcx * sin_y
 
-            # find the curvature and the angle 
-            alpha   = self.path_points_yaw[self.goal] - (curr_yaw)
+            # true look-ahead distance to the goal
+            L = math.hypot(gvcx, gvcy)
+
+            # alpha is the bearing to the lookahead point in the vehicle frame
+            alpha   = math.atan2(goal_y_veh_coord, goal_x_veh_coord)
             k       = 0.285
-            angle_i = math.atan((2 * k * self.wheelbase * math.sin(alpha)) / L) 
+            angle_i = math.atan((2 * k * self.wheelbase * math.sin(alpha)) / L)
             angle   = angle_i*2
             angle   = round(np.clip(angle, -0.61, 0.61), 3)
 
-            ct_error = round(np.sin(alpha) * L, 3)
+            ct_error = round(goal_y_veh_coord, 3)
 
             print("Crosstrack Error: " + str(ct_error))
 
