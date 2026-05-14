@@ -2,8 +2,11 @@
 """
 Run in simulator container with:
 
-    rosrun gem_gazebo inference_node.py _model:=cnn _speed:=2
+    python3 inference_node.py _model:=cnn _speed:=2
+    python3 inference_node.py _model:=cnn_lstm _speed:=2
+    python3 inference_node.py _model:=cnn_node _speed:=2
 """
+import os
 import rospy
 import torch
 from torchvision import transforms
@@ -15,10 +18,11 @@ from sensor_msgs.msg import Image
 from ackermann_msgs.msg import AckermannDrive
 from cv_bridge import CvBridge
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHECKPOINTS = {
-    "cnn":      "/home/marialusardi/host/Classes/gem_simulation_ws/checkpoints/cnn/best.ts.pt",
-    "cnn_lstm": "/home/marialusardi/host/Classes}/gem_simulation_ws/checkpoints/cnn_lstm/best.ts.pt",
-    "cnn_node": "/home/marialusardi/host/Classes/gem_simulation_ws/checkpoints/cnn_node/best.ts.pt",
+    "cnn":      os.path.join(SCRIPT_DIR, "checkpoints/cnn/best.ts.pt"),
+    "cnn_lstm": os.path.join(SCRIPT_DIR, "checkpoints/cnn_lstm/best.ts.pt"),
+    "cnn_node": os.path.join(SCRIPT_DIR, "checkpoints/cnn_node/best.ts.pt"),
 }
 SEQ_LENS       = {"cnn": 1, "cnn_lstm": 3, "cnn_node": 3}
 IMAGE_TOPIC    = "/oak/rgb/image_raw"
