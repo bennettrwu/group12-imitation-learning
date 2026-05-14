@@ -158,8 +158,8 @@ def main():
 
     # Reload best weights and export TorchScript for ROS2 inference.
     model.load_state_dict(torch.load(out_dir / "best.pt", map_location=device))
-    model.cpu().eval()
-    example = torch.randn(1, seq_len, 3, args.image_size, args.image_size)
+    model.eval()
+    example = torch.randn(1, seq_len, 3, args.image_size, args.image_size, device=device)
     traced = torch.jit.trace(model, example)
     torch.jit.save(traced, str(out_dir / "best.ts.pt"))
     print(f"best val MSE: {best_val:.5f}\tsaved at: {out_dir}/best.pt + best.ts.pt")
