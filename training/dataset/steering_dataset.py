@@ -49,7 +49,7 @@ class SteeringDataset(Dataset):
             ctrl_map = {}
             with open(ctrl_file) as f:
                 for row in csv.DictReader(f):
-                    ctrl_map[int(row['timestamp_ns'])] = float(row['steering_output_rad'])
+                    ctrl_map[int(row['timestamp_ns'])] = float(row['steering_angle_rad'])
             self._controls[seq] = ctrl_map
 
             with open(ts_file) as f:
