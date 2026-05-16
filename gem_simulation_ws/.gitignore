@@ -1,0 +1,5 @@
+build
+devel
+src/CMakeLists.txt
+src/POLARIS_GEM_Simulator/gem_simulator/gem_gazebo/models/high_bay_3d/
+.catkin_workspace
