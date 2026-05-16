@@ -11,6 +11,7 @@ import argparse
 import csv
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
@@ -58,11 +59,33 @@ def epoch_loss(model, loader, device, optimizer=None) -> float:
             total_n += rgb.size(0)
     return total_loss / total_n
 
+def save_loss_plot(history: list[tuple], out_dir: Path, model_name: str) -> None:
+    """Save a train/val MSE vs. epoch plot to out_dir/loss_curve.png."""
+    epochs, train_mses, val_mses = zip(*history)
+ 
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(epochs, train_mses, label="Train MSE", linewidth=1.5)
+    ax.plot(epochs, val_mses,   label="Val MSE",   linewidth=1.5, linestyle="--")
+ 
+    best_epoch = min(history, key=lambda r: r[2])
+    ax.axvline(best_epoch[0], color="grey", linewidth=0.8, linestyle=":", label=f"Best val (epoch {best_epoch[0]})")
+    ax.scatter([best_epoch[0]], [best_epoch[2]], zorder=5, color="C1")
+ 
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("MSE")
+    ax.set_title(f"Train vs. Val MSE — {model_name}")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+ 
+    plot_path = out_dir / "loss_curve.png"
+    fig.savefig(plot_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"loss curve saved: {plot_path}")
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", choices=list(MODELS), required=True)
-    p.add_argument("--data-root", default="data/processed_sim")
+    p.add_argument("--data-root", default="training/data/training")
     p.add_argument("--output-dir", default="training/checkpoints")
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch-size", type=int, default=64)
@@ -155,6 +178,9 @@ def main():
         writer = csv.writer(f)
         writer.writerow(["epoch", "train_mse", "val_mse"])
         writer.writerows(history)
+
+    # Save loss curve plot
+    save_loss_plot(history, out_dir, args.model)
 
     # Reload best weights and export TorchScript for ROS2 inference.
     model.load_state_dict(torch.load(out_dir / "best.pt", map_location=device))
